@@ -1,8 +1,6 @@
-﻿package com.livekeys.officetool.pptutil;
+package com.livekeys.officetool.pptutil;
 
 import org.apache.poi.ooxml.POIXMLDocumentPart;
-import org.apache.poi.sl.usermodel.TextParagraph;
-import org.apache.poi.xddf.usermodel.text.FontAlignment;
 import org.apache.poi.xslf.usermodel.*;
 import org.openxmlformats.schemas.drawingml.x2006.main.CTTextParagraph;
 import org.openxmlformats.schemas.drawingml.x2006.main.CTTextParagraphProperties;
@@ -164,7 +162,7 @@ public class PPTUtil {
     }
 
     public void test() {
-        List<XSLFSlide> slides = pptx.getSlides();
+
     }
 
 }
