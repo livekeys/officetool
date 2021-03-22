@@ -1,4 +1,4 @@
-package com.livekeys.officetool.pptutil;
+﻿package com.livekeys.officetool.pptutil;
 
 import org.apache.poi.ooxml.POIXMLDocumentPart;
 import org.apache.poi.xslf.usermodel.*;
@@ -114,6 +114,7 @@ public class PPTUtil {
             XSLFSlide slide = slides.get(i);
             XSLFChart chart = this.getChartFromSlide(slide);
             logger.info(chart.getTitleShape().getText());
+	    logger.info(chart.getTitleShape().getText());
         }
 
     }
