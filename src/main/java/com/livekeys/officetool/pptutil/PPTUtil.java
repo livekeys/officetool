@@ -141,23 +141,54 @@ public class PPTUtil {
         return textBoxes;
     }
 
+    /**
+     * 设置幻灯片段落垂直对齐方式
+     * @param paragraph
+     * @param vertical
+     */
     public void setPargraphVerticalAlign(XSLFTextParagraph paragraph, String vertical) {
         if (vertical == null && "".equals(vertical)) {
             vertical = "auto";
         }
-        CTTextParagraph ctTextParagraph = paragraph.getXmlObject();
+
+        setCTTextParagraphVerticalAlign(paragraph.getXmlObject(), vertical.toLowerCase());
+    }
+
+    // 设置段落垂直对齐
+    private void setCTTextParagraphVerticalAlign(CTTextParagraph ctTextParagraph, String verticalStr) {
         CTTextParagraphProperties pPr = ctTextParagraph.getPPr() == null ? ctTextParagraph.addNewPPr() : ctTextParagraph.getPPr();
-        String verticalStr = vertical.toLowerCase();
-        if ("auto".equals(verticalStr)) {
-            pPr.setFontAlgn(STTextFontAlignType.AUTO);
-        } else if ("top".equals(verticalStr)) {
-            pPr.setFontAlgn(STTextFontAlignType.T);
-        } else if ("baseline".equals(verticalStr)) {
-            pPr.setFontAlgn(STTextFontAlignType.BASE);
-        } else if ("bottom".equals(verticalStr)) {
-            pPr.setFontAlgn(STTextFontAlignType.B);
-        } else if ("center".equals(verticalStr)) {
-            pPr.setFontAlgn(STTextFontAlignType.CTR);
+
+        switch (verticalStr) {
+            case "top" : pPr.setFontAlgn(STTextFontAlignType.T);   break;   // 顶部
+            case "baseline" : pPr.setFontAlgn(STTextFontAlignType.BASE);   break;  // 基线对齐
+            case "bottom" : pPr.setFontAlgn(STTextFontAlignType.B);   break;    // 底部
+            case "center" : pPr.setFontAlgn(STTextFontAlignType.CTR);   break;    // 居中
+            default: pPr.setFontAlgn(STTextFontAlignType.AUTO);  // 自动
+        }
+    }
+
+    /**
+     * 设置幻灯片段落水平对齐方式
+     * @param paragraph
+     * @param horizontal
+     */
+    public void setParagraphHorizontalAlign(XSLFTextParagraph paragraph, String horizontal) {
+        if (horizontal == null && "".equals(horizontal)) {
+            horizontal = "auto";
+        }
+
+        setCTTextParagraphHorizonAlign(paragraph.getXmlObject(), horizontal.toLowerCase());
+    }
+
+    // 设置段落水平对齐方式
+    private void setCTTextParagraphHorizonAlign(CTTextParagraph ctTextParagraph, String horizontalStr) {
+        CTTextParagraphProperties pPr = ctTextParagraph.getPPr() == null ? ctTextParagraph.addNewPPr() : ctTextParagraph.getPPr();
+        switch (horizontalStr) {
+            case "left" : pPr.setAlgn(STTextAlignType.L);   break;  // 左对齐
+            case "right": pPr.setAlgn(STTextAlignType.R);   break;  // 右对齐
+            case "center": pPr.setAlgn(STTextAlignType.CTR);    break;  // 居中
+            case "disperse" : pPr.setAlgn(STTextAlignType.DIST);    break;  // 分散对齐
+            default: pPr.setAlgn(STTextAlignType.JUST); // 两端对齐
         }
     }
 
