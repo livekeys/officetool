@@ -147,11 +147,11 @@ public class PPTUtil {
     public void setParagraphVerticalAlign(XSLFTextParagraph paragraph, String vertical) {
         vertical = this.nullToDefault(vertical, "auto");
 
-        setCTTextParagraphVerticalAlign(paragraph.getXmlObject(), vertical.toLowerCase());
+        setCTTextParagraphVerticalAlign(paragraph, vertical.toLowerCase());
     }
 
     // 设置段落垂直对齐
-    private void setCTTextParagraphVerticalAlign(CTTextParagraph ctTextParagraph, String verticalStr) {
+    private void setCTTextParagraphVerticalAlign(XSLFTextParagraph ctTextParagraph, String verticalStr) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         switch (verticalStr) {
             case "top" : pPr.setFontAlgn(STTextFontAlignType.T);   break;   // 顶部
@@ -170,11 +170,11 @@ public class PPTUtil {
     public void setParagraphHorizontalAlign(XSLFTextParagraph paragraph, String horizontal) {
         horizontal = this.nullToDefault(horizontal, "auto");
 
-        setCTTextParagraphHorizonAlign(paragraph.getXmlObject(), horizontal.toLowerCase());
+        setCTTextParagraphHorizonAlign(paragraph, horizontal.toLowerCase());
     }
 
     // 设置段落水平对齐方式
-    private void setCTTextParagraphHorizonAlign(CTTextParagraph ctTextParagraph, String horizontalStr) {
+    private void setCTTextParagraphHorizonAlign(XSLFTextParagraph ctTextParagraph, String horizontalStr) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
 
         switch (horizontalStr) {
@@ -187,8 +187,8 @@ public class PPTUtil {
     }
 
     // 获取 pPr
-    private CTTextParagraphProperties getPPR(CTTextParagraph ctTextParagraph) {
-        return ctTextParagraph.getPPr() == null ? ctTextParagraph.addNewPPr() : ctTextParagraph.getPPr();
+    private CTTextParagraphProperties getPPR(XSLFTextParagraph ctTextParagraph) {
+        return ctTextParagraph.getXmlObject().getPPr() == null ? ctTextParagraph.getXmlObject().addNewPPr() : ctTextParagraph.getXmlObject().getPPr();
     }
 
     /**
@@ -196,9 +196,29 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param lvl
      */
-    public void setBulletNum(CTTextParagraph ctTextParagraph, int lvl) {
+    public void setBulletLvl(XSLFTextParagraph ctTextParagraph, int lvl) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         pPr.setLvl(lvl);
+    }
+
+    /**
+     * 设置段落自动编号
+     * @param ctTextParagraph
+     * @param startAt
+     */
+    public void setAutoBullet(XSLFTextParagraph ctTextParagraph, int startAt) {
+        CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
+        CTTextAutonumberBullet bullet = pPr.isSetBuAutoNum() ? pPr.getBuAutoNum() : pPr.addNewBuAutoNum();
+        bullet.setStartAt(startAt);
+    }
+
+    /**
+     * 设置缩进等级，即悬挂缩进
+     * @param ctTextParagraph
+     * @param indentLevel
+     */
+    public void setIndentLevel(XSLFTextParagraph ctTextParagraph, int indentLevel) {
+        ctTextParagraph.setIndentLevel(indentLevel);
     }
 
     /**
@@ -206,7 +226,7 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param colorHex
      */
-    public void setBulletColor(CTTextParagraph ctTextParagraph, String colorHex) {
+    public void setBulletColor(XSLFTextParagraph ctTextParagraph, String colorHex) {
         colorHex = this.nullToDefault(colorHex, "000000");
 
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
@@ -225,7 +245,7 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param pounts    磅
      */
-    public void setLineSpacingPounts(CTTextParagraph ctTextParagraph, String pounts) {
+    public void setLineSpacingPounts(XSLFTextParagraph ctTextParagraph, String pounts) {
         pounts = this.nullToDefault(pounts, "1");
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         CTTextSpacing lnSpc = pPr.getLnSpc() == null ? pPr.addNewLnSpc() : pPr.getLnSpc();
@@ -243,7 +263,7 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param multiple 倍数，几倍行距
      */
-    public void setLineSpacing(CTTextParagraph ctTextParagraph, Double multiple) {
+    public void setLineSpacing(XSLFTextParagraph ctTextParagraph, Double multiple) {
 
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         CTTextSpacing lnSpc = pPr.getLnSpc() == null ? pPr.addNewLnSpc() : pPr.getLnSpc();
@@ -261,7 +281,7 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param pounts
      */
-    public void setCTTextParagraphSpacingBefore(CTTextParagraph ctTextParagraph, String pounts) {
+    public void setCTTextParagraphSpacingBefore(XSLFTextParagraph ctTextParagraph, String pounts) {
         pounts = this.nullToDefault(pounts, "1");
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         CTTextSpacing ctTextSpacing = pPr.isSetSpcBef() ? pPr.getSpcBef() : pPr.addNewSpcBef();
@@ -280,7 +300,7 @@ public class PPTUtil {
      * @param ctTextParagraph
      * @param pounts
      */
-    public void setCTTextParagraphSpacingAfter(CTTextParagraph ctTextParagraph, String pounts) {
+    public void setCTTextParagraphSpacingAfter(XSLFTextParagraph ctTextParagraph, String pounts) {
         pounts = this.nullToDefault(pounts, "1");
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         CTTextSpacing ctTextSpacing = pPr.isSetSpcAft() ? pPr.getSpcAft() : pPr.addNewSpcAft();
@@ -294,23 +314,12 @@ public class PPTUtil {
         spacing.setVal(pts);
     }
 
-    public void setCTTextParagraphIdent(CTTextParagraph ctTextParagraph, String charsNum) {
+    public void setCTTextParagraphIndent(XSLFTextParagraph ctTextParagraph, String charsNum) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         pPr.setIndent(Integer.valueOf(charsNum));
     }
 
-    public void test(XSLFTextParagraph paragraph) {
-        CTTextParagraphProperties pPr = this.getPPR(paragraph.getXmlObject());
-        CTTextSpacing lnSpc = pPr.getLnSpc() == null ? pPr.addNewLnSpc() : pPr.getLnSpc();
-        if (lnSpc.isSetSpcPct()) {
-            lnSpc.unsetSpcPct();
-        }
-
-        CTTextSpacingPoint spcPts = lnSpc.getSpcPts() == null ? lnSpc.addNewSpcPts() : lnSpc.getSpcPts();
-        spcPts.setVal(20);
-    }
-
-
+   // 空字符串转默认值
     private String nullToDefault(String goalStr, String defaultStr) {
         if (goalStr == null || "".equals(goalStr)) {
             return defaultStr;
