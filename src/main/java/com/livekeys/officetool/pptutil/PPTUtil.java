@@ -2,6 +2,7 @@ package com.livekeys.officetool.pptutil;
 
 import org.apache.poi.ooxml.POIXMLDocumentPart;
 import org.apache.poi.xslf.usermodel.*;
+import org.apache.xmlbeans.XmlObject;
 import org.openxmlformats.schemas.drawingml.x2006.main.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PPTUtil {
 
@@ -138,6 +142,36 @@ public class PPTUtil {
         }
         return textBoxes;
     }
+
+    public XSLFAutoShape getAutoShape(XSLFSlide slide) {
+        for (XSLFShape shape : slide.getShapes()) {
+            if (shape instanceof XSLFAutoShape) {
+                return (XSLFAutoShape) shape;
+            }
+        }
+        return null;
+    }
+
+    public List<XSLFAutoShape> getAllAutoShape(XSLFSlide slide) {
+        List<XSLFAutoShape> autoShapes = new ArrayList<XSLFAutoShape>();
+        for (XSLFShape shape : slide.getShapes()) {
+            if (shape instanceof XSLFAutoShape) {
+                autoShapes.add((XSLFAutoShape) shape);
+            }
+        }
+        return autoShapes;
+    }
+
+    // 获取所有幻灯片
+    public List<XSLFSlide> getSlides() {
+        return pptx.getSlides();
+    }
+
+    // 获取所有幻灯片的获取所有图标
+    public List<XSLFChart> getCharts() {
+        return pptx.getCharts();
+    }
+
 
     /**
      * 设置幻灯片段落垂直对齐方式
@@ -314,10 +348,244 @@ public class PPTUtil {
         spacing.setVal(pts);
     }
 
+    /**
+     * 设置缩进字符
+     * @param ctTextParagraph
+     * @param charsNum
+     */
     public void setCTTextParagraphIndent(XSLFTextParagraph ctTextParagraph, String charsNum) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         pPr.setIndent(Integer.valueOf(charsNum));
     }
+
+    /**
+     * 为一个段落添加文本，appendText 参数为 true 的话，就追加文本，false 的话就重开头设置文本
+     * @param paragraph  要操作的段落
+     * @param text  文本
+     * @param appendText    是否追加文本
+     */
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph, Boolean appendText, String text, Boolean bold) {
+        XSLFTextRun textRun = getNewRun(paragraph, appendText);
+        textRun.setText(text);
+        textRun.setBold(bold);
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold);    // 添加文本
+        textRun.setFontSize(Double.valueOf(fontSize));  // 设置字体大小
+
+        CTTextCharacterProperties rPr = getRPr(textRun.getXmlObject());
+        setRPRFontFamily(rPr, chinesefontFamily, westernFontFamily);    // 设置字体
+
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize,
+                                        String color) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold, chinesefontFamily, westernFontFamily, fontSize);    // 添加文本
+        textRun.setFontSize(Double.valueOf(fontSize));  // 设置字体大小
+        CTTextCharacterProperties rPr = getRPr(textRun.getXmlObject());
+
+        // 设置字体颜色
+        CTSolidColorFillProperties solidColor = rPr.isSetSolidFill() ? rPr.getSolidFill() : rPr.addNewSolidFill();
+        CTSRgbColor ctColor = solidColor.isSetSrgbClr() ? solidColor.getSrgbClr() : solidColor.addNewSrgbClr();
+        ctColor.setVal(hexToByteArray(color.substring(1)));
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize,
+                                        String color,
+                                        Boolean italic) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold, chinesefontFamily, westernFontFamily, fontSize, color);    // 添加文本
+        textRun.setItalic(italic);
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize,
+                                        String color,
+                                        Boolean italic,
+                                        Boolean strike) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold, chinesefontFamily, westernFontFamily, fontSize, color, italic);    // 添加文本
+        textRun.setStrikethrough(strike);
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize,
+                                        String color,
+                                        Boolean italic,
+                                        Boolean strike,
+                                        Boolean underline) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold, chinesefontFamily, westernFontFamily, fontSize, color, italic, strike);    // 添加文本
+        textRun.setUnderlined(underline);
+        return textRun;
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph,
+                                        Boolean appendText,
+                                        String text,
+                                        Boolean bold,
+                                        String chinesefontFamily,
+                                        String westernFontFamily,
+                                        String fontSize,
+                                        String color,
+                                        Boolean italic,
+                                        Boolean strike,
+                                        Boolean underline,
+                                        String characterSpacing) {
+        XSLFTextRun textRun = addParagraphText(paragraph, appendText, text, bold, chinesefontFamily, westernFontFamily, fontSize, color, italic, strike, underline);    // 添加文本
+        textRun.setCharacterSpacing(Double.valueOf(characterSpacing));
+        return textRun;
+    }
+
+    // 替换段内的标签文本
+    public void replaceTagInParagraph(XSLFTextParagraph paragraph, Map<String, Object> paramMap) {
+
+        String paraText = paragraph.getText();
+        String regEx = "\\{.+?\\}";
+        Pattern pattern = Pattern.compile(regEx);
+        Matcher matcher = pattern.matcher(paraText);
+
+        if (matcher.find()) {
+            StringBuilder keyWord = new StringBuilder();
+            int start = getRunIndex(paragraph, "{");
+            int end = getRunIndex(paragraph, "}");
+
+            // 处理 {***} 在一个 run 内的情况
+            if (start == end) {
+                String rs = matcher.group(0);   // 存放标签
+                keyWord.append(rs.replace("{", "").replace("}", ""));   // 存放 key
+                String text = getRunsT(paragraph, start, end + 1);
+                String v = nullToDefault(paramMap.get(keyWord.toString()), keyWord.toString());
+                setText(paragraph.getTextRuns().get(start), text.replace(rs, v));
+
+            }
+
+            replaceTagInParagraph(paragraph, paramMap); // 继续找
+        }
+
+    }
+
+    private String getRunsT(XSLFTextParagraph paragraph, int start, int end) {
+        List<XSLFTextRun> textRuns = paragraph.getTextRuns();
+        StringBuilder t = new StringBuilder();
+        for (int i = start; i < end; i++) {
+            t.append(textRuns.get(i).getRawText());
+        }
+        return t.toString();
+    }
+
+    private void setText(XSLFTextRun run, String t) {
+        run.setText(t);
+    }
+
+    private int getRunIndex(XSLFTextParagraph paragraph, String word) {
+        List<CTRegularTextRun> rList = paragraph.getXmlObject().getRList();
+        for (int i = 0; i < rList.size(); i++) {
+
+            String text = rList.get(i).getT();
+            if (text.contains(word)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // 设置 rPr 的字体
+    private void setRPRFontFamily(CTTextCharacterProperties rPr, String chinesefontFamily, String westernFontFamily) {
+        if (chinesefontFamily == null || "".equals(chinesefontFamily)) {
+            chinesefontFamily = "宋体";
+        }
+
+        if (westernFontFamily == null || "".equals(westernFontFamily)) {
+            westernFontFamily = "宋体";
+        }
+
+
+        if (rPr.isSetLatin()) {
+            rPr.unsetLatin();
+        }
+
+        CTTextFont ea = rPr.isSetEa() ? rPr.getEa() : rPr.addNewEa();
+        ea.setTypeface(chinesefontFamily);
+        ea.setPitchFamily(new Byte("34"));
+        ea.setCharset(new Byte("-122"));
+
+        CTTextFont cs = rPr.isSetCs() ? rPr.getCs() : rPr.addNewCs();
+        cs.setTypeface(chinesefontFamily);
+        cs.setPitchFamily(new Byte("34"));
+        cs.setCharset(new Byte("-122"));
+
+        CTTextFont latin = rPr.isSetLatin() ? rPr.getLatin() : rPr.addNewLatin();
+        latin.setTypeface(westernFontFamily);
+        latin.setPitchFamily(new Byte("34"));
+        latin.setCharset(new Byte("-122"));
+    }
+
+    // 获取新添加的 run
+    private XSLFTextRun getNewRun(XSLFTextParagraph paragraph, Boolean appendText)  {
+        if (!appendText) {  // 是否追加文本
+            this.clearParagraphText(paragraph);
+        }
+
+        return paragraph.addNewTextRun();
+    }
+
+    private void clearParagraphText(XSLFTextParagraph paragraph) {
+        CTTextParagraph ctTextParagraph = paragraph.getXmlObject();
+//        int s = ctTextParagraph.getRList().size();
+//        for (int i = 0; i < s; i++) {
+//            ctTextParagraph.removeR(0);
+//        }
+        ctTextParagraph.getRList().clear();
+        paragraph.getTextRuns().clear();
+    }
+
+    // 获取 rPR
+    private CTTextCharacterProperties getRPr(XmlObject xmlObject) {
+        if (xmlObject instanceof CTTextField) {
+            CTTextField tf = (CTTextField) xmlObject;
+            return tf.getRPr() == null ? tf.addNewRPr() : tf.getRPr();
+        } else if (xmlObject instanceof CTTextLineBreak) {
+            CTTextLineBreak tlb = (CTTextLineBreak) xmlObject;
+            return tlb.getRPr() == null ? tlb.addNewRPr() : tlb.getRPr();
+        } else {
+            CTRegularTextRun tr = (CTRegularTextRun) xmlObject;
+            return tr.getRPr() == null ? tr.addNewRPr() : tr.getRPr();
+        }
+    }
+
+
 
    // 空字符串转默认值
     private String nullToDefault(String goalStr, String defaultStr) {
@@ -325,6 +593,18 @@ public class PPTUtil {
             return defaultStr;
         }
         return goalStr;
+    }
+
+    private String nullToDefault(Object o, String defaultStr) {
+        if (o == null) {
+            return defaultStr;
+        } else {
+            if ("".equals(o.toString())) {
+                return defaultStr;
+            } else {
+                return o.toString();
+            }
+        }
     }
 
     /**
