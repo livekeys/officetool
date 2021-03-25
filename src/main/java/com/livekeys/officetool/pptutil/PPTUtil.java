@@ -3,6 +3,8 @@ package com.livekeys.officetool.pptutil;
 import org.apache.poi.ooxml.POIXMLDocumentPart;
 import org.apache.poi.xslf.usermodel.*;
 import org.apache.xmlbeans.XmlObject;
+import org.openxmlformats.schemas.drawingml.x2006.chart.CTChart;
+import org.openxmlformats.schemas.drawingml.x2006.chart.CTPlotArea;
 import org.openxmlformats.schemas.drawingml.x2006.main.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -468,7 +470,11 @@ public class PPTUtil {
         return textRun;
     }
 
-    // 替换段内的标签文本
+    /**
+     * 替换段内的标签文本
+     * @param paragraph
+     * @param paramMap
+     */
     public void replaceTagInParagraph(XSLFTextParagraph paragraph, Map<String, Object> paramMap) {
 
         String paraText = paragraph.getText();
@@ -485,17 +491,16 @@ public class PPTUtil {
             if (start == end) {
                 String rs = matcher.group(0);   // 存放标签
                 keyWord.append(rs.replace("{", "").replace("}", ""));   // 存放 key
-                String text = getRunsT(paragraph, start, end + 1);
-                String v = nullToDefault(paramMap.get(keyWord.toString()), keyWord.toString());
-                setText(paragraph.getTextRuns().get(start), text.replace(rs, v));
-
+                String text = getRunsT(paragraph, start, end + 1);  // 获取标签所在 run 的全部文字
+                String v = nullToDefault(paramMap.get(keyWord.toString()), keyWord.toString()); // 如果没在 paramMap 中没有找到这个标签所对应的值，那么就直接替换成标签的值
+                setText(paragraph.getTextRuns().get(start), text.replace(rs, v));   // 重新设置文本
             }
-
             replaceTagInParagraph(paragraph, paramMap); // 继续找
         }
 
     }
 
+    // 获取段落下特定索引的 run 的值
     private String getRunsT(XSLFTextParagraph paragraph, int start, int end) {
         List<XSLFTextRun> textRuns = paragraph.getTextRuns();
         StringBuilder t = new StringBuilder();
@@ -505,10 +510,12 @@ public class PPTUtil {
         return t.toString();
     }
 
+    // 设置 run 的值
     private void setText(XSLFTextRun run, String t) {
         run.setText(t);
     }
 
+    // 获取 word 在段落中出现第一次的 run 的索引
     private int getRunIndex(XSLFTextParagraph paragraph, String word) {
         List<CTRegularTextRun> rList = paragraph.getXmlObject().getRList();
         for (int i = 0; i < rList.size(); i++) {
@@ -561,12 +568,9 @@ public class PPTUtil {
         return paragraph.addNewTextRun();
     }
 
+    // 清除段落的文本
     private void clearParagraphText(XSLFTextParagraph paragraph) {
         CTTextParagraph ctTextParagraph = paragraph.getXmlObject();
-//        int s = ctTextParagraph.getRList().size();
-//        for (int i = 0; i < s; i++) {
-//            ctTextParagraph.removeR(0);
-//        }
         ctTextParagraph.getRList().clear();
         paragraph.getTextRuns().clear();
     }
