@@ -3,8 +3,7 @@ package com.livekeys.officetool.pptutil;
 import org.apache.poi.ooxml.POIXMLDocumentPart;
 import org.apache.poi.xslf.usermodel.*;
 import org.apache.xmlbeans.XmlObject;
-import org.openxmlformats.schemas.drawingml.x2006.chart.CTChart;
-import org.openxmlformats.schemas.drawingml.x2006.chart.CTPlotArea;
+import org.openxmlformats.schemas.drawingml.x2006.chart.*;
 import org.openxmlformats.schemas.drawingml.x2006.main.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -498,6 +497,142 @@ public class PPTUtil {
             replaceTagInParagraph(paragraph, paramMap); // 继续找
         }
 
+    }
+
+    /**
+     * 从当前图表中获取柱状图列表
+     * @param chart
+     * @return
+     */
+    public List<CTBarChart> getBarChartFromChart(XSLFChart chart) {
+        CTPlotArea plotArea = this.getChartPlotArea(chart);
+        return plotArea.getBarChartList();
+    }
+
+    /**
+     * 从当前图表中获取折线图列表
+     * @param chart
+     * @return
+     */
+    public List<CTLineChart> getLineChartFromChart(XSLFChart chart) {
+        CTPlotArea plotArea = this.getChartPlotArea(chart);
+        return plotArea.getLineChartList();
+    }
+
+    /**
+     * 从当前图表中获取饼状图
+     * @param chart
+     * @return
+     */
+    public List<CTPieChart> getPieChartFromChart(XSLFChart chart) {
+        CTPlotArea plotArea = this.getChartPlotArea(chart);
+        return plotArea.getPieChartList();
+    }
+
+    /**
+     * 从当前图表中获取雷达图
+     * @param chart
+     * @return
+     */
+    public List<CTRadarChart> getRadarChartFromChart(XSLFChart chart) {
+        CTPlotArea plotArea = this.getChartPlotArea(chart);
+        return plotArea.getRadarChartList();
+    }
+
+
+    public void updateBarCat(CTBarChart barChart, int serIndex, List<List<String>> data) {
+        CTBarSer ctBarSer = barChart.getSerList().get(serIndex);
+        CTAxDataSource cat = ctBarSer.getCat();
+
+        if (ctBarSer.isSetExtLst()) {
+            ctBarSer.unsetExtLst();
+        }
+
+        this.replaceCat(cat, data);
+    }
+
+    public void updateLineCat(CTLineChart lineChart, int serIndex, List<List<String>> data) {
+        CTLineSer ctLineSer = lineChart.getSerList().get(serIndex);
+        CTAxDataSource cat = ctLineSer.getCat();
+
+        if (ctLineSer.isSetExtLst()) {
+            ctLineSer.unsetExtLst();
+        }
+
+        this.replaceCat(cat, data);
+    }
+
+    public void updatePieCat(CTPieChart pieChart, int serIndex, List<List<String>> data) {
+        CTPieSer ctPieSer = pieChart.getSerList().get(serIndex);
+        CTAxDataSource cat = ctPieSer.getCat();
+
+        if (ctPieSer.isSetExtLst()) {
+            ctPieSer.unsetExtLst();
+        }
+
+        this.replaceCat(cat, data);
+    }
+
+    public void updateRadarCat(CTRadarChart radarChart, int serIndex, List<List<String>> data) {
+        CTRadarSer ctRadarSer = radarChart.getSerList().get(serIndex);
+        CTAxDataSource cat = ctRadarSer.getCat();
+
+        if (ctRadarSer.isSetExtLst()) {
+            ctRadarSer.unsetExtLst();
+        }
+
+        this.replaceCat(cat, data);
+    }
+
+    private void replaceCat(CTAxDataSource cat, List<List<String>> data) {
+        if (cat.isSetNumRef()) {
+            this.updateCat(cat.getNumRef(), data);
+        } else if (cat.isSetStrRef()) {
+            this.updateCat(cat.getStrRef(), data);
+        } else if (cat.isSetMultiLvlStrRef()) {
+            CTMultiLvlStrRef multiLvlStrRef = cat.getMultiLvlStrRef();
+            CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
+            List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
+            for (int i = 0; i < lvlList.size(); i++) {
+                this.updateCat(multiLvlStrRef, i, data.get(i));
+            }
+        }
+    }
+
+    // 更新cat中多系列的缓存
+    private void updateCat(CTMultiLvlStrRef multiLvlStrRef, int lvlAtIndex, List<String> data) {
+        CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
+        List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
+        CTLvl ctLvl = lvlList.get(lvlAtIndex);
+
+        List<CTStrVal> ptList = ctLvl.getPtList();
+        for (int i = 0; i < ptList.size(); i++) {
+            ptList.get(i).setV(data.get(i));
+        }
+    }
+
+    // 更新 strRef 类型的 cat 缓存
+    private void updateCat(CTStrRef strRef, List<List<String>> data) {
+        CTStrData strCache = strRef.getStrCache();
+        List<CTStrVal> ptList = strCache.getPtList();
+        for (int i = 0; i < ptList.size(); i++) {
+            ptList.get(i).setV(data.get(0).get(i));
+        }
+    }
+
+    // 更新 numRef 类型的 cat 缓存
+    private void updateCat(CTNumRef numRef, List<List<String>> data) {
+        CTNumData numCache = numRef.getNumCache();
+        List<CTNumVal> ptList = numCache.getPtList();
+        for (int i = 0; i < ptList.size(); i++) {
+            ptList.get(i).setV(data.get(0).get(i));
+        }
+    }
+
+
+    // 获取 plotArea
+    private CTPlotArea getChartPlotArea(XSLFChart chart) {
+        return chart.getCTChart().getPlotArea();
     }
 
     // 获取段落下特定索引的 run 的值
