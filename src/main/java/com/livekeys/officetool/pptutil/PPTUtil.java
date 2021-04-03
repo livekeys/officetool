@@ -475,7 +475,6 @@ public class PPTUtil {
      * @param paramMap
      */
     public void replaceTagInParagraph(XSLFTextParagraph paragraph, Map<String, Object> paramMap) {
-
         String paraText = paragraph.getText();
         String regEx = "\\{.+?\\}";
         Pattern pattern = Pattern.compile(regEx);
@@ -496,7 +495,6 @@ public class PPTUtil {
             }
             replaceTagInParagraph(paragraph, paramMap); // 继续找
         }
-
     }
 
     /**
@@ -539,51 +537,128 @@ public class PPTUtil {
         return plotArea.getRadarChartList();
     }
 
-
+    /**
+     * 更新柱状图的 cat 缓存
+     * @param barChart
+     * @param serIndex
+     * @param data
+     */
     public void updateBarCat(CTBarChart barChart, int serIndex, List<List<String>> data) {
         CTBarSer ctBarSer = barChart.getSerList().get(serIndex);
         CTAxDataSource cat = ctBarSer.getCat();
 
-        if (ctBarSer.isSetExtLst()) {
-            ctBarSer.unsetExtLst();
+        if (barChart.isSetExtLst()) {
+            barChart.unsetExtLst();
         }
 
         this.replaceCat(cat, data);
     }
 
+    /**
+     * 更新柱状图的缓存数据
+     * @param barChart
+     * @param serIndex
+     * @param data
+     */
+    public void updateBarDataCache(CTBarChart barChart, int serIndex, List<String> data) {
+        CTBarSer ctBarSer = barChart.getSerList().get(serIndex);
+        CTNumRef numRef = ctBarSer.getVal().getNumRef();
+
+        this.replaceVal(numRef, data);
+    }
+
+    /**
+     * 更新折线图的 cat 缓存
+     * @param lineChart
+     * @param serIndex
+     * @param data
+     */
     public void updateLineCat(CTLineChart lineChart, int serIndex, List<List<String>> data) {
         CTLineSer ctLineSer = lineChart.getSerList().get(serIndex);
         CTAxDataSource cat = ctLineSer.getCat();
 
-        if (ctLineSer.isSetExtLst()) {
-            ctLineSer.unsetExtLst();
+        if (lineChart.isSetExtLst()) {
+            lineChart.unsetExtLst();
         }
 
         this.replaceCat(cat, data);
     }
 
+    /**
+     * 更新折线图的缓存数据
+     * @param lineChart
+     * @param serIndex
+     * @param data
+     */
+    public void updateLineDataCache(CTLineChart lineChart, int serIndex, List<String> data) {
+        CTLineSer ctLineSer = lineChart.getSerList().get(serIndex);
+        CTNumRef numRef = ctLineSer.getVal().getNumRef();
+
+        this.replaceVal(numRef, data);
+    }
+
+    /**
+     * 更新饼图的 cat 缓存
+     * @param pieChart
+     * @param serIndex
+     * @param data
+     */
     public void updatePieCat(CTPieChart pieChart, int serIndex, List<List<String>> data) {
         CTPieSer ctPieSer = pieChart.getSerList().get(serIndex);
         CTAxDataSource cat = ctPieSer.getCat();
 
-        if (ctPieSer.isSetExtLst()) {
-            ctPieSer.unsetExtLst();
+        if (pieChart.isSetExtLst()) {
+            pieChart.unsetExtLst();
         }
 
         this.replaceCat(cat, data);
     }
 
+    /**
+     * 更新饼图的缓存数据
+     * @param pieChart
+     * @param serIndex
+     * @param data
+     */
+    public void updatePieDataCache(CTPieChart pieChart, int serIndex, List<String> data) {
+        CTPieSer ctPieSer = pieChart.getSerList().get(serIndex);
+        CTNumRef numRef = ctPieSer.getVal().getNumRef();
+
+        this.replaceVal(numRef, data);
+    }
+
+    /**
+     * 更新雷达图的 cat 缓存
+     * @param radarChart
+     * @param serIndex
+     * @param data
+     */
     public void updateRadarCat(CTRadarChart radarChart, int serIndex, List<List<String>> data) {
         CTRadarSer ctRadarSer = radarChart.getSerList().get(serIndex);
         CTAxDataSource cat = ctRadarSer.getCat();
 
-        if (ctRadarSer.isSetExtLst()) {
-            ctRadarSer.unsetExtLst();
+        if (radarChart.isSetExtLst()) {
+            radarChart.unsetExtLst();
         }
 
         this.replaceCat(cat, data);
     }
 
+    /**
+     * 更新雷达图的缓存数据
+     * @param radarChart
+     * @param serIndex
+     * @param data
+     */
+    public void updateRadarDataCache(CTRadarChart radarChart, int serIndex, List<String> data) {
+        CTRadarSer ctRadarSer = radarChart.getSerList().get(serIndex);
+        CTNumRef numRef = ctRadarSer.getVal().getNumRef();
+
+        this.replaceVal(numRef, data);
+    }
+
+
+    // 替换 Cat 缓存
     private void replaceCat(CTAxDataSource cat, List<List<String>> data) {
         if (cat.isSetNumRef()) {
             this.updateCat(cat.getNumRef(), data);
@@ -599,34 +674,82 @@ public class PPTUtil {
         }
     }
 
+    // 替换数据
+    private void replaceVal(CTNumRef numRef, List<String> data) {
+        numRef.unsetNumCache();
+
+        CTNumData ctNumData = numRef.addNewNumCache();
+        ctNumData.addNewPtCount().setVal(data.size());
+
+        for (int i = 0; i < data.size(); i++) {
+            ctNumData.addNewPt().setV(data.get(i));
+        }
+    }
+
     // 更新cat中多系列的缓存
     private void updateCat(CTMultiLvlStrRef multiLvlStrRef, int lvlAtIndex, List<String> data) {
+        // 重新设置 pt
         CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
-        List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
-        CTLvl ctLvl = lvlList.get(lvlAtIndex);
 
-        List<CTStrVal> ptList = ctLvl.getPtList();
-        for (int i = 0; i < ptList.size(); i++) {
-            ptList.get(i).setV(data.get(i));
+        CTUnsignedInt ptCount = multiLvlStrCache.getPtCount() == null ? multiLvlStrCache.addNewPtCount() : multiLvlStrCache.getPtCount();
+        ptCount.setVal(data.size());
+
+        CTLvl ctLvl = multiLvlStrCache.getLvlList().get(lvlAtIndex);
+        int size = ctLvl.getPtList().size();
+        for (int i = 0; i < size; i++) {
+            ctLvl.removePt(0);
         }
+        for (int i = 0; i < data.size(); i++) {
+            ctLvl.addNewPt().setV(data.get(i));
+        }
+
+//        // 引用原来的 pt
+//        CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
+//        List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
+//        CTLvl ctLvl = lvlList.get(lvlAtIndex);
+//
+//        List<CTStrVal> ptList = ctLvl.getPtList();
+//        for (int i = 0; i < ptList.size(); i++) {
+//            ptList.get(i).setV(data.get(i));
+//        }
     }
 
     // 更新 strRef 类型的 cat 缓存
     private void updateCat(CTStrRef strRef, List<List<String>> data) {
-        CTStrData strCache = strRef.getStrCache();
-        List<CTStrVal> ptList = strCache.getPtList();
-        for (int i = 0; i < ptList.size(); i++) {
-            ptList.get(i).setV(data.get(0).get(i));
+
+        // 重新设置 pt
+        strRef.unsetStrCache();
+        CTStrData ctStrData = strRef.addNewStrCache();
+        ctStrData.addNewPtCount().setVal(data.get(0).size());
+        for (int i = 0; i < data.get(0).size(); i++) {
+            ctStrData.addNewPt().setV(data.get(0).get(i));
         }
+
+//        // 引用原来的 pt
+//        CTStrData strCache = strRef.getStrCache();
+//        List<CTStrVal> ptList = strCache.getPtList();
+//        for (int i = 0; i < ptList.size(); i++) {
+//            ptList.get(i).setV(data.get(0).get(i));
+//        }
     }
 
     // 更新 numRef 类型的 cat 缓存
     private void updateCat(CTNumRef numRef, List<List<String>> data) {
-        CTNumData numCache = numRef.getNumCache();
-        List<CTNumVal> ptList = numCache.getPtList();
-        for (int i = 0; i < ptList.size(); i++) {
-            ptList.get(i).setV(data.get(0).get(i));
+        // 重新设置 pt
+        numRef.unsetNumCache();
+        CTNumData ctNumData = numRef.addNewNumCache();
+        ctNumData.addNewPtCount().setVal(data.get(0).size());
+        for (int i = 0; i < data.get(0).size(); i++) {
+            ctNumData.addNewPt().setV(data.get(0).get(i));
         }
+
+
+//        // 引用原来的 pt
+//        CTNumData numCache = numRef.getNumCache();
+//        List<CTNumVal> ptList = numCache.getPtList();
+//        for (int i = 0; i < ptList.size(); i++) {
+//            ptList.get(i).setV(data.get(0).get(i));
+//        }
     }
 
 
