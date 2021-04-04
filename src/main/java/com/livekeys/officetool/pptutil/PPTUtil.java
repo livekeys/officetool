@@ -1,3 +1,7 @@
+/**
+ * @author: LV
+ */
+
 package com.livekeys.officetool.pptutil;
 
 import org.apache.poi.ooxml.POIXMLDocumentPart;
@@ -498,6 +502,21 @@ public class PPTUtil {
     }
 
     /**
+     * 在标题内添加段落， append 参数指定是追加还是覆盖
+     * @param titleShape
+     * @param append
+     * @return
+     */
+    public XSLFTextParagraph setChartTitle(XSLFTextShape titleShape, Boolean append) {
+        if (append) {
+            return titleShape.addNewTextParagraph();
+        } else {
+            titleShape.clearText();
+            return titleShape.addNewTextParagraph();
+        }
+    }
+
+    /**
      * 从当前图表中获取柱状图列表
      * @param chart
      * @return
@@ -665,12 +684,7 @@ public class PPTUtil {
         } else if (cat.isSetStrRef()) {
             this.updateCat(cat.getStrRef(), data);
         } else if (cat.isSetMultiLvlStrRef()) {
-            CTMultiLvlStrRef multiLvlStrRef = cat.getMultiLvlStrRef();
-            CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
-            List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
-            for (int i = 0; i < lvlList.size(); i++) {
-                this.updateCat(multiLvlStrRef, i, data.get(i));
-            }
+            this.updateCat(cat.getMultiLvlStrRef(), data);
         }
     }
 
@@ -682,36 +696,27 @@ public class PPTUtil {
         ctNumData.addNewPtCount().setVal(data.size());
 
         for (int i = 0; i < data.size(); i++) {
-            ctNumData.addNewPt().setV(data.get(i));
+            CTNumVal ctNumVal = ctNumData.addNewPt();
+            ctNumVal.setIdx(i);
+            ctNumVal.setV(data.get(i));
         }
     }
 
     // 更新cat中多系列的缓存
-    private void updateCat(CTMultiLvlStrRef multiLvlStrRef, int lvlAtIndex, List<String> data) {
-        // 重新设置 pt
-        CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
+    private void updateCat(CTMultiLvlStrRef multiLvlStrRef, List<List<String>> data) {
+        multiLvlStrRef.unsetMultiLvlStrCache();
 
-        CTUnsignedInt ptCount = multiLvlStrCache.getPtCount() == null ? multiLvlStrCache.addNewPtCount() : multiLvlStrCache.getPtCount();
-        ptCount.setVal(data.size());
+        CTMultiLvlStrData ctMultiLvlStrData = multiLvlStrRef.addNewMultiLvlStrCache();
+        ctMultiLvlStrData.addNewPtCount().setVal(data.get(0).size());
 
-        CTLvl ctLvl = multiLvlStrCache.getLvlList().get(lvlAtIndex);
-        int size = ctLvl.getPtList().size();
-        for (int i = 0; i < size; i++) {
-            ctLvl.removePt(0);
-        }
         for (int i = 0; i < data.size(); i++) {
-            ctLvl.addNewPt().setV(data.get(i));
+            CTLvl ctLvl = ctMultiLvlStrData.addNewLvl();
+            for (int j = 0; j < data.get(i).size(); j++) {
+                CTStrVal ctStrVal = ctLvl.addNewPt();
+                ctStrVal.setV(data.get(i).get(j));
+                ctStrVal.setIdx(j);
+            }
         }
-
-//        // 引用原来的 pt
-//        CTMultiLvlStrData multiLvlStrCache = multiLvlStrRef.getMultiLvlStrCache();
-//        List<CTLvl> lvlList = multiLvlStrCache.getLvlList();
-//        CTLvl ctLvl = lvlList.get(lvlAtIndex);
-//
-//        List<CTStrVal> ptList = ctLvl.getPtList();
-//        for (int i = 0; i < ptList.size(); i++) {
-//            ptList.get(i).setV(data.get(i));
-//        }
     }
 
     // 更新 strRef 类型的 cat 缓存
@@ -722,7 +727,9 @@ public class PPTUtil {
         CTStrData ctStrData = strRef.addNewStrCache();
         ctStrData.addNewPtCount().setVal(data.get(0).size());
         for (int i = 0; i < data.get(0).size(); i++) {
-            ctStrData.addNewPt().setV(data.get(0).get(i));
+            CTStrVal ctStrVal = ctStrData.addNewPt();
+            ctStrVal.setV(data.get(0).get(i));
+            ctStrVal.setIdx(i);
         }
 
 //        // 引用原来的 pt
@@ -740,7 +747,9 @@ public class PPTUtil {
         CTNumData ctNumData = numRef.addNewNumCache();
         ctNumData.addNewPtCount().setVal(data.get(0).size());
         for (int i = 0; i < data.get(0).size(); i++) {
-            ctNumData.addNewPt().setV(data.get(0).get(i));
+            CTNumVal ctNumVal = ctNumData.addNewPt();
+            ctNumVal.setV(data.get(0).get(i));
+            ctNumVal.setIdx(i);
         }
 
 
