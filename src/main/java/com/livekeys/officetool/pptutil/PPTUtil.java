@@ -5,6 +5,8 @@
 package com.livekeys.officetool.pptutil;
 
 import org.apache.poi.ooxml.POIXMLDocumentPart;
+import org.apache.poi.sl.usermodel.TextBox;
+import org.apache.poi.sl.usermodel.TextParagraph;
 import org.apache.poi.xslf.usermodel.*;
 import org.apache.xmlbeans.XmlObject;
 import org.openxmlformats.schemas.drawingml.x2006.chart.*;
@@ -41,6 +43,9 @@ public class PPTUtil {
     private XMLSlideShow readPPT(String filePath) {
         try {
             this.pptx = new XMLSlideShow(new FileInputStream(new File(filePath)));
+            if (logger.isDebugEnabled()) {
+                logger.debug("已读取文件：" + filePath);
+            }
             return this.pptx;
         } catch (IOException e) {
             e.printStackTrace();
@@ -498,6 +503,59 @@ public class PPTUtil {
                 setText(paragraph.getTextRuns().get(start), text.replace(rs, v));   // 重新设置文本
             }
             replaceTagInParagraph(paragraph, paramMap); // 继续找
+        }
+    }
+
+    /**
+     * 获取幻灯片内的所有段落
+     * @param slide
+     * @return
+     */
+    public List<XSLFTextParagraph> getParagraphsFromSlide(XSLFSlide slide) {
+        List<XSLFTextParagraph> textParagraphs = new ArrayList<XSLFTextParagraph>();    // 存放所有 shape 的所有段落
+        List<XSLFShape> textShapes = new ArrayList<XSLFShape>();    // 存放所有可能拥有段落文本的 shape
+
+        // 解析出所有段落文本的 shape
+        List<XSLFShape> shapes = slide.getShapes();
+        for (XSLFShape shape : shapes) {
+            getTextShape(textShapes, shape);
+        }
+
+        // 解析出所有段落
+        for (XSLFShape shape : textShapes) {
+            textParagraphs.addAll(parseParagraph(shape));
+        }
+
+        return textParagraphs;
+    }
+
+    // 解析一个 shape 内的所有段落
+    private List<XSLFTextParagraph> parseParagraph(XSLFShape shape) {
+        if (shape instanceof XSLFAutoShape) {
+            XSLFAutoShape autoShape = (XSLFAutoShape) shape;
+            return autoShape.getTextParagraphs();
+        } else if (shape instanceof XSLFTextShape) {
+            XSLFTextShape textShape = (XSLFTextShape) shape;
+            return textShape.getTextParagraphs();
+        } else if (shape instanceof XSLFFreeformShape) {
+            XSLFFreeformShape freeformShape = (XSLFFreeformShape) shape;
+            return freeformShape.getTextParagraphs();
+        } else if (shape instanceof TextBox) {
+            TextBox textBox = (TextBox) shape;
+            return textBox.getTextParagraphs();
+        }
+        return new ArrayList<XSLFTextParagraph>();
+    }
+
+    // 解析出所有可能拥有段落文本的 shape
+    private void getTextShape(List<XSLFShape> shapeList, XSLFShape shape) {
+        if (shape instanceof XSLFGroupShape) {
+            XSLFGroupShape groupShape = (XSLFGroupShape) shape;
+            for (XSLFShape xslfShape : groupShape.getShapes()) {
+                getTextShape(shapeList, xslfShape);
+            }
+        } else {
+            shapeList.add(shape);
         }
     }
 
