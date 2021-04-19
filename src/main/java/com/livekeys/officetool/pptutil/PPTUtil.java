@@ -4,7 +4,9 @@
 
 package com.livekeys.officetool.pptutil;
 
+import com.livekeys.officetool.pptutil.entity.ParagraphTextStyle;
 import org.apache.poi.ooxml.POIXMLDocumentPart;
+import org.apache.poi.sl.usermodel.TableCell;
 import org.apache.poi.sl.usermodel.TextBox;
 import org.apache.poi.sl.usermodel.TextParagraph;
 import org.apache.poi.xslf.usermodel.*;
@@ -14,14 +16,17 @@ import org.openxmlformats.schemas.drawingml.x2006.main.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -278,7 +283,7 @@ public class PPTUtil {
         if (pPr.isSetBuClr()) {
             pPr.unsetBuClr();
         }
-
+        CTTextParagraph xmlObject = ctTextParagraph.getXmlObject();
         CTColor ctColor = pPr.addNewBuClr();
         CTSRgbColor ctsRgbColor = ctColor.addNewSrgbClr();
         ctsRgbColor.setVal(hexToByteArray(colorHex.substring(1)));
@@ -366,6 +371,13 @@ public class PPTUtil {
     public void setCTTextParagraphIndent(XSLFTextParagraph ctTextParagraph, String charsNum) {
         CTTextParagraphProperties pPr = this.getPPR(ctTextParagraph);
         pPr.setIndent(Integer.valueOf(charsNum));
+    }
+
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph, Boolean appendText, String text) {
+        XSLFTextRun textRun = getNewRun(paragraph, appendText);
+        textRun.setText(text);  // 设置文本
+
+        return textRun;
     }
 
     /**
@@ -477,6 +489,219 @@ public class PPTUtil {
         textRun.setCharacterSpacing(Double.valueOf(characterSpacing));
         return textRun;
     }
+
+    /**
+     * 根据已设定好的对象来设置文本的样式
+     * @param paragraph
+     * @param appendText
+     * @param text
+     * @param pts
+     * @return
+     */
+    public XSLFTextRun addParagraphText(XSLFTextParagraph paragraph, Boolean appendText, String text, ParagraphTextStyle pts) {
+        XSLFTextRun textRun = getNewRun(paragraph, appendText); // 添加一个新的 run
+        textRun.setText(text);  // 设置文本
+
+        setTextStyle(textRun, pts);
+
+        return textRun;
+    }
+
+    // 取消某个方向上的边框
+    private void unsetCellBorder(CTTableCellProperties cellProperties, String posStr) {
+        switch (posStr) {
+            case "left" : cellProperties.unsetLnL();
+            case "right" : cellProperties.unsetLnR();
+            case "top" : cellProperties.unsetLnT();
+            case "bottom" : cellProperties.unsetLnB();
+            default: {
+                logger.warn(posStr + " position not exists! position include ['left', 'right', 'top', 'bottom'");
+            }
+        }
+    }
+
+    // 获取边框中某方向上的属性
+    private CTLineProperties getCTLineProperties(CTTableCellProperties cellProperties, String posStr) {
+        // 定义边框下的方向
+        List<String> posList = new ArrayList<String>();
+        posList.addAll(Arrays.asList("top", "left", "bottom", "right"));
+
+        switch (posStr) {
+            case "left" : return cellProperties.isSetLnL() ? cellProperties.getLnL() : cellProperties.addNewLnL();
+            case "right" : return cellProperties.isSetLnR() ? cellProperties.getLnR() : cellProperties.addNewLnR();
+            case "top" : return cellProperties.isSetLnT() ? cellProperties.getLnT() : cellProperties.addNewLnT();
+            case "bottom" : return cellProperties.isSetLnB() ? cellProperties.getLnB() : cellProperties.addNewLnB();
+            default: {
+                logger.warn(posStr + " position not exists! position include ['left', 'right', 'top', 'bottom'");
+                return cellProperties.isSetLnL() ? cellProperties.getLnT() : cellProperties.addNewLnT();
+            }
+        }
+    }
+    // 设置边框的颜色和线条类型
+    private void setCellBorder(CTLineProperties ctLineProperties, String lineType, String lineColorHex) {
+        // 构造边框线的类型
+        List<String> lineTypes = new ArrayList<String>();
+        lineTypes.addAll(Arrays.asList("solid", "dot", "dash", "lgDash", "dashDot", "lgDashDot", "lgDashDotDot", "sysDash", "sysDot", "sysDashDot", "sysDashDotDot"));
+
+        // 设置边框线的颜色
+        CTSolidColorFillProperties ctSolidColorFillProperties = ctLineProperties.addNewSolidFill();
+        CTSRgbColor ctsRgbColor = ctSolidColorFillProperties.addNewSrgbClr();
+        ctsRgbColor.setVal(hexToByteArray(lineColorHex.substring(1)));
+
+        CTPresetLineDashProperties ctPresetLineDashProperties = ctLineProperties.addNewPrstDash();
+        if (lineTypes.contains(lineType)) { // 在 lineTypes 里面
+            ctPresetLineDashProperties.setVal(STPresetLineDashVal.Enum.forString(lineType));
+        } else {    // 没在 lineTyppes 里面
+            ctPresetLineDashProperties.setVal(STPresetLineDashVal.Enum.forString("solid"));
+        }
+    }
+
+    // 根据 XSLFTableCell 获取 TcPr
+    private CTTableCellProperties getCellProperties(XSLFTableCell cell) {
+        CTTableCell ctTableCell = (CTTableCell) cell.getXmlObject();
+        return ctTableCell.isSetTcPr() ? ctTableCell.getTcPr() : ctTableCell.addNewTcPr();
+    }
+
+    // 设置 run 属性
+    private void setTextStyle(XSLFTextRun run, ParagraphTextStyle pts) {
+
+        setTextBold(run, pts.getBold());
+        setTextFontFamily(run, pts.getFontFamily());
+        setTextWesternFontFamily(run, pts.getWesternFontFamily());
+        setTextFontSize(run, pts.getFontSize());
+        setTextColor(run, pts.getColorHex());
+        setTextItalic(run, pts.getItalic());
+        setTextStrike(run, pts.getStrike());
+        setTextUnderline(run, pts.getUnderline());
+    }
+
+    /**
+     * 设置字体加粗
+     * @param run
+     * @param bold
+     * @return
+     */
+    public XSLFTextRun setTextBold(XSLFTextRun run, Boolean bold) {
+        if (bold == null) {
+            return run;
+        }
+
+        run.setBold(bold);
+        return run;
+    }
+
+    /**
+     * 设置中文字体
+     * @param run
+     * @param fontFamily
+     * @return
+     */
+    public XSLFTextRun setTextFontFamily(XSLFTextRun run, String fontFamily) {
+        if (fontFamily == null || "".equals(fontFamily)) {
+            return run;
+        }
+
+        CTTextCharacterProperties rPr = getRPr(run.getXmlObject());
+        this.setRPRChineseFontFamily(rPr, fontFamily);
+        return run;
+    }
+
+    /**
+     * 设置西文字体
+     * @param run
+     * @param westernFontFamily
+     * @return
+     */
+    public XSLFTextRun setTextWesternFontFamily(XSLFTextRun run, String westernFontFamily) {
+        if (westernFontFamily == null || "".equals(westernFontFamily)) {
+            return run;
+        }
+
+        CTTextCharacterProperties rPr = getRPr(run.getXmlObject());
+        this.setRPRWesternFontFamily(rPr, westernFontFamily);
+        return run;
+    }
+
+    /**
+     * 设置字体大小
+     * @param run
+     * @param fontSize
+     * @return
+     */
+    public XSLFTextRun setTextFontSize(XSLFTextRun run, String fontSize) {
+        if (fontSize == null || "".equals(fontSize)) {
+            return run;
+        }
+
+        run.setFontSize(Double.valueOf(fontSize));  // 设置字体大小
+        return run;
+    }
+
+    /**
+     * 设置字体颜色
+     * @param run
+     * @param colorHex  16进制颜色单位
+     * @return
+     */
+    public XSLFTextRun setTextColor(XSLFTextRun run, String colorHex) {
+        if (colorHex == null || "".equals(colorHex)) {
+            return run;
+        }
+
+        CTTextCharacterProperties rPr = getRPr(run.getXmlObject());
+        CTSolidColorFillProperties solidColor = rPr.isSetSolidFill() ? rPr.getSolidFill() : rPr.addNewSolidFill();
+        CTSRgbColor ctColor = solidColor.isSetSrgbClr() ? solidColor.getSrgbClr() : solidColor.addNewSrgbClr();
+        ctColor.setVal(hexToByteArray(colorHex.substring(1)));
+        return run;
+    }
+
+    /**
+     * 设置字体是否斜体
+     * @param run
+     * @param italic
+     * @return
+     */
+    public XSLFTextRun setTextItalic(XSLFTextRun run, Boolean italic) {
+        if (italic == null) {
+            return run;
+        }
+
+        run.setItalic(italic);
+        return run;
+    }
+
+    /**
+     * 设置字体删除线
+     * @param run
+     * @param strike
+     * @return
+     */
+    public XSLFTextRun setTextStrike(XSLFTextRun run, Boolean strike) {
+        if (strike == null) {
+            return run;
+        }
+
+        run.setStrikethrough(strike);
+        return run;
+    }
+
+    /**
+     * 设置字体下划线
+     * @param run
+     * @param underline
+     * @return
+     */
+    public XSLFTextRun setTextUnderline(XSLFTextRun run, Boolean underline) {
+        if (underline == null) {
+            return run;
+        }
+
+        // 设置下划线
+        run.setUnderlined(underline);
+        return run;
+    }
+
+
 
     /**
      * 替换段内的标签文本
@@ -691,6 +916,7 @@ public class PPTUtil {
         this.replaceCat(cat, data);
     }
 
+
     /**
      * 更新饼图的缓存数据
      * @param pieChart
@@ -734,6 +960,306 @@ public class PPTUtil {
         this.replaceVal(numRef, data);
     }
 
+    /**
+     * 获取表格的行数
+     * @param table
+     * @return
+     */
+    public int getTableRowsNum(XSLFTable table) {
+        return table.getNumberOfRows();
+    }
+
+    /**
+     * 获取表格的列数
+     * @param table
+     * @return
+     */
+    public int getTableColsNum(XSLFTable table) {
+        return table.getNumberOfColumns();
+    }
+
+    /**
+     * 设置单元格文本
+     * @param cell
+     * @param text
+     */
+    public void setCellText(XSLFTableCell cell, String text) {
+//        cell.setText(text);
+        CTTableCell ctTableCell = (CTTableCell) cell.getXmlObject();
+        CTTextBody ctTextBody = ctTableCell.isSetTxBody() ? ctTableCell.getTxBody() : ctTableCell.addNewTxBody();
+        CTTextParagraph p = null;
+        if (ctTextBody.getPList().size() < 1) {
+            p = ctTextBody.addNewP();
+        } else {
+            p = ctTextBody.getPList().get(0);
+            // 删除多余的 p
+            if (ctTextBody.getPList().size() > 1) {
+                for (int i = 1; i < ctTextBody.getPList().size(); i++) {
+                    ctTextBody.removeP(i);
+                }
+            }
+        }
+
+        CTRegularTextRun r = null;
+        if (p.getRList().size() < 1) {
+            r = p.addNewR();
+        } else {
+            r = p.getRList().get(0);
+            // 删除多余的 r
+            if (p.getRList().size() > 1) {
+                for (int i = 1; i < p.getRList().size(); i++) {
+                    p.removeR(i);
+                }
+            }
+        }
+
+        r.setT(text);   // 设置文本
+    }
+
+    /**
+     * 设置该单元格所有的边框颜色和线条
+     * @param cell
+     * @param lineType
+     * @param lineColorHex
+     */
+    public void setCellBorder(XSLFTableCell cell, String lineType, String lineColorHex) {
+        CTTableCellProperties cellProperties = getCellProperties(cell);
+
+        if (lineType == null || "".equals(lineType)) {
+            cellProperties.unsetLnT();
+            cellProperties.unsetLnB();
+            cellProperties.unsetLnR();
+            cellProperties.unsetLnL();
+        } else {
+            setCellBorder(getCTLineProperties(cellProperties, "left"), lineType, lineColorHex);
+            setCellBorder(getCTLineProperties(cellProperties, "right"), lineType, lineColorHex);
+            setCellBorder(getCTLineProperties(cellProperties, "top"), lineType, lineColorHex);
+            setCellBorder(getCTLineProperties(cellProperties, "bottom"), lineType, lineColorHex);
+        }
+    }
+
+    /**
+     * 设置 cell 的颜色
+     * @param cell
+     * @param colorHex
+     */
+    public void setCellColor(XSLFTableCell cell, String colorHex) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextColor(textRun, colorHex);
+            }
+        }
+    }
+
+    /**
+     * 设置 cell 文本是否加粗
+     * @param cell
+     * @param bold
+     */
+    public void setCellBold(XSLFTableCell cell, Boolean bold) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextBold(textRun, bold);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格是否加下划线
+     * @param cell
+     * @param underline
+     */
+    public void setCellUnderline(XSLFTableCell cell, Boolean underline) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextUnderline(textRun, underline);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格是否加删除线
+     * @param cell
+     * @param strike
+     */
+    public void setCellStrike(XSLFTableCell cell, Boolean strike) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextStrike(textRun, strike);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格中文字体
+     * @param cell
+     * @param fontFamily
+     */
+    public void setCellFontfamily(XSLFTableCell cell, String fontFamily) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextFontFamily(textRun, fontFamily);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格文本字体大小
+     * @param cell
+     * @param fontSize
+     */
+    public void setCellFontSize(XSLFTableCell cell, String fontSize) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextFontSize(textRun, fontSize);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格文本斜体
+     * @param cell
+     * @param italic
+     */
+    public void setCellItalic(XSLFTableCell cell, Boolean italic) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextItalic(textRun, italic);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格文本样式
+     * @param cell
+     * @param pts
+     */
+    public void setCellTextStyle(XSLFTableCell cell, ParagraphTextStyle pts) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextStyle(textRun, pts);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格西文字体
+     * @param cell
+     * @param westernFontFamily
+     */
+    public void setCellFontWesternFontfamily(XSLFTableCell cell, String westernFontFamily) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            for (XSLFTextRun textRun : textParagraph.getTextRuns()) {
+                setTextWesternFontFamily(textRun, westernFontFamily);
+            }
+        }
+    }
+
+    /**
+     * 设置单元格水平对齐方式
+     * @param cell
+     * @param horizontalAlign
+     */
+    public void setCellHorizontalAlign(XSLFTableCell cell, String horizontalAlign) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            setParagraphHorizontalAlign(textParagraph, horizontalAlign);
+        }
+    }
+
+    /**
+     * 设置单元格垂直对齐方式
+     * @param cell
+     * @param verticalAlign
+     */
+    public void setCellVerticalAlign(XSLFTableCell cell, String verticalAlign) {
+        List<XSLFTextParagraph> textParagraphs = cell.getTextParagraphs();
+        for (XSLFTextParagraph textParagraph : textParagraphs) {
+            setParagraphVerticalAlign(textParagraph, verticalAlign);
+        }
+    }
+
+    /**
+     * 设置单元格某一个方向上的线条和颜色
+     * @param cell
+     * @param posStr
+     * @param lineType
+     * @param lineColorHex
+     */
+    public void setCellBorder(XSLFTableCell cell, String posStr, String lineType, String lineColorHex) {
+        CTTableCellProperties cellProperties = getCellProperties(cell);
+
+        if (lineType == null || "".equals(lineType)) {
+            unsetCellBorder(cellProperties, posStr);
+        }
+
+        String pos = posStr.toLowerCase();  // 转换成小写
+
+        CTLineProperties ctLineProperties = getCTLineProperties(cellProperties, posStr);
+
+        setCellBorder(ctLineProperties, lineType, lineColorHex);    // 设置线条和颜色
+    }
+
+    /**
+     * 设置单元格的填充颜色
+     * @param cell
+     * @param fillColorHex
+     */
+    public void setCellFillColor(XSLFTableCell cell, String fillColorHex) {
+        CTTableCell ctTableCell = (CTTableCell) cell.getXmlObject();
+        CTTableCellProperties tcPr = ctTableCell.getTcPr();
+
+        if (fillColorHex == null || "".equals(fillColorHex)) {    // 如果 fillColor 为空，那么就是无填充
+            if (!tcPr.isSetNoFill()) {
+                tcPr.addNewNoFill();
+            }
+            if (tcPr.isSetSolidFill()) {
+                tcPr.unsetSolidFill();
+            }
+        } else {
+            tcPr.unsetNoFill();
+            CTSolidColorFillProperties fillProperties = tcPr.isSetSolidFill() ? tcPr.getSolidFill() : tcPr.addNewSolidFill();
+            CTSRgbColor ctsRgbColor = fillProperties.isSetSrgbClr() ? fillProperties.getSrgbClr() : fillProperties.addNewSrgbClr();
+            ctsRgbColor.setVal(hexToByteArray(fillColorHex.substring(1)));
+        }
+    }
+
+    /**
+     * 获取表格某行
+     * @param table
+     * @param rowNum
+     * @return
+     */
+    public XSLFTableRow getTableRow(XSLFTable table, int rowNum) {
+        return table.getRows().get(rowNum);
+    }
+
+    /**
+     * 获取行列表
+     * @param table
+     * @return
+     */
+    public List<XSLFTableRow> getTableRows(XSLFTable table) {
+        return table.getRows();
+    }
+
+    /**
+     * 根据某行或取单元格列表
+     * @param row
+     * @return
+     */
+    public List<XSLFTableCell> getTableCols(XSLFTableRow row){
+        return row.getCells();
+    }
 
     // 替换 Cat 缓存
     private void replaceCat(CTAxDataSource cat, List<List<String>> data) {
@@ -855,31 +1381,41 @@ public class PPTUtil {
 
     // 设置 rPr 的字体
     private void setRPRFontFamily(CTTextCharacterProperties rPr, String chinesefontFamily, String westernFontFamily) {
-        if (chinesefontFamily == null || "".equals(chinesefontFamily)) {
-            chinesefontFamily = "宋体";
-        }
+        this.setRPRChineseFontFamily(rPr, chinesefontFamily);
+        this.setRPRWesternFontFamily(rPr, westernFontFamily);
+    }
 
-        if (westernFontFamily == null || "".equals(westernFontFamily)) {
-            westernFontFamily = "宋体";
+    // 设置中文字体
+    private void setRPRChineseFontFamily(CTTextCharacterProperties rPr, String fontFamily) {
+        if (fontFamily == null || "".equals(fontFamily)) {
+            fontFamily = "宋体";
         }
-
 
         if (rPr.isSetLatin()) {
             rPr.unsetLatin();
         }
 
         CTTextFont ea = rPr.isSetEa() ? rPr.getEa() : rPr.addNewEa();
-        ea.setTypeface(chinesefontFamily);
+        ea.setTypeface(fontFamily);
         ea.setPitchFamily(new Byte("34"));
         ea.setCharset(new Byte("-122"));
 
         CTTextFont cs = rPr.isSetCs() ? rPr.getCs() : rPr.addNewCs();
-        cs.setTypeface(chinesefontFamily);
+        cs.setTypeface(fontFamily);
         cs.setPitchFamily(new Byte("34"));
         cs.setCharset(new Byte("-122"));
+    }
 
+    // 设置西文字体
+    private void setRPRWesternFontFamily(CTTextCharacterProperties rPr, String fontFamily) {
+        if (fontFamily == null || "".equals(fontFamily)) {
+            fontFamily = "宋体";
+        }
+        if (rPr.isSetLatin()) {
+            rPr.unsetLatin();
+        }
         CTTextFont latin = rPr.isSetLatin() ? rPr.getLatin() : rPr.addNewLatin();
-        latin.setTypeface(westernFontFamily);
+        latin.setTypeface(fontFamily);
         latin.setPitchFamily(new Byte("34"));
         latin.setCharset(new Byte("-122"));
     }
